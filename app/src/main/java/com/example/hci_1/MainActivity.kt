@@ -1,11 +1,17 @@
 package com.example.hci_1
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
+import androidx.compose.ui.graphics.Color as ComposeColor
 import android.graphics.Paint
+import android.media.AudioManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.AttributeSet
 import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -16,15 +22,41 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.hci_1.lullabyer.L
 import com.example.hci_1.ui.theme.Hci_1Theme
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
@@ -32,12 +64,6 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.TimeUnit
-import androidx.camera.view.PreviewView
-import android.content.Context
-import android.util.AttributeSet
-import android.media.AudioManager
-import android.os.Handler
-import android.os.Looper
 
 
 class MainActivity : ComponentActivity() {
@@ -47,25 +73,121 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        var isInitial = true
+        val buttonText = if (isInitial) "Start" else "End"
 
         if (allPermissionsGranted()) {
-            startCamera()
         } else {
             ActivityCompat.requestPermissions(
                 this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
             )
         }
 
+        setupFaceDetector()
         setContent {
             Hci_1Theme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    CameraPreview()
-                    CustomOverlay()
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Top,
+                        horizontalAlignment = Alignment.CenterHorizontally
+
+                    ) {
+
+                        Image(
+                            imageVector = Lullabyer.L,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .width(200.dp)
+                                .height(200.dp)
+                                .padding(32.dp)
+                        )
+                        Text(text = "Lullabyer", fontSize = 32.sp, fontWeight=FontWeight.Bold, )
+                        Text(text = "Makes Your Media to Lullaby for Well-Sleep", fontSize = 16.sp)
+                        Box(modifier = Modifier
+                            .height(0.dp)
+                            .padding(16.dp)) {
+                            AndroidView(factory = { context ->
+                                PreviewView(context).also {
+                                    viewFinder = it
+                                }
+                            })
+                        }
+                        toggleButton()
+                        Box(modifier = Modifier
+                            .height(50.dp)
+                            .padding(16.dp)){
+                            AndroidView(factory = { context ->
+                                GraphicOverlay(context, null).also {
+                                    graphicOverlay = it
+                                }
+                            })
+                        }
+
+
+                    }
                 }
             }
         }
-        setupFaceDetector()
+
+
     }
+
+    @Composable
+    private fun toggleButton() {
+        var isInitial by remember { mutableStateOf(true) }
+        val buttonText = if (isInitial) "Start" else "End"
+
+        val gradient = if (isInitial) {
+            Brush.linearGradient(
+                colors = listOf(ComposeColor(0xFF00008B), ComposeColor(0xFF87CEEB)),
+            )
+        } else {
+            Brush.linearGradient(
+                colors = listOf(ComposeColor(0xFF87CEEB), ComposeColor(0xFF00008B)),
+            )
+        }
+
+        Button(
+            onClick = {
+                isInitial = !isInitial
+                if (isInitial) {
+                    stopCamera()
+                } else {
+                    startCamera()
+                }
+            },
+            colors=ButtonDefaults.buttonColors(
+                containerColor = ComposeColor.Transparent,
+            ),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end=16.dp),
+            contentPadding = PaddingValues(16.dp),
+
+        ) {
+            Box(
+
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(brush = gradient, shape = RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp)).padding(16.dp),
+                contentAlignment = Alignment.Center
+            ){
+
+
+            Text(
+                text = buttonText,
+                fontSize = 20.sp
+            )
+            }
+        }
+    }
+
 
     private fun adjustBrightness(level: Float) {
         val window = window
@@ -110,33 +232,21 @@ class MainActivity : ComponentActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+    private fun stopCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        cameraProviderFuture.addListener({
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            cameraProvider.unbindAll()
+        }, ContextCompat.getMainExecutor(this))
+    }
+
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
             baseContext, it
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    @Composable
-    fun CameraPreview() {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AndroidView(factory = { context ->
-                PreviewView(context).also {
-                    viewFinder = it
-                }
-            })
-        }
-    }
-
-    @Composable
-    fun CustomOverlay() {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AndroidView(factory = { context ->
-                GraphicOverlay(context, null).also {
-                    graphicOverlay = it
-                }
-            })
-        }
-    }
 
     private fun setupFaceDetector() {
         val options = FaceDetectorOptions.Builder()
@@ -146,9 +256,16 @@ class MainActivity : ComponentActivity() {
             .build()
 
         detector = FaceDetection.getClient(options)
+        Log.e("FaceDetection", "Face detector initialized successfully")
     }
 
-    private inner class YourAnalyzer(private val mainActivity: MainActivity) : ImageAnalysis.Analyzer {
+    private fun closeFaceDetector() {
+        detector.close()
+        Log.e("FaceDetection", "Face detector closed successfully")
+    }
+
+    private inner class YourAnalyzer(private val mainActivity: MainActivity) :
+        ImageAnalysis.Analyzer {
         private var lastAnalyzedTimestamp = 0L
         private var lastBlinkState = false
         private var blinkStartTime = 0L
@@ -253,7 +370,11 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private class FaceGraphic(private val overlay: GraphicOverlay, private val face: Face, private val analyzer: YourAnalyzer) : GraphicOverlay.Graphic(overlay) {
+    private class FaceGraphic(
+        private val overlay: GraphicOverlay,
+        private val face: Face,
+        private val analyzer: YourAnalyzer
+    ) : GraphicOverlay.Graphic(overlay) {
 
         private val facePositionPaint: Paint = Paint().apply {
             color = Color.GREEN
@@ -310,7 +431,7 @@ class GraphicOverlay(context: Context, attrs: AttributeSet?) : View(context, att
             color = Color.BLACK
             textSize = 40f
         }
-        canvas.drawText("Blink Count: $blinkCount", width - 400f, 100f, textPaint)
+        canvas.drawText("Blink Count: $blinkCount", 20f, 20f, textPaint)
     }
 
     abstract class Graphic(private val overlay: GraphicOverlay) {
@@ -355,7 +476,12 @@ class GraphicOverlay(context: Context, attrs: AttributeSet?) : View(context, att
             color = Color.BLACK
             textSize = 40f
         }
-        canvas.drawText("Blink Duration: ${blinkDuration / 1000f} seconds", width - 400f, 150f, textPaint)
+        canvas.drawText(
+            "Blink Duration: ${blinkDuration / 1000f} seconds",
+            20f,
+            80f,
+            textPaint
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
