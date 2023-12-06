@@ -1,7 +1,10 @@
 package com.example.hci_1
 
 import android.Manifest
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
@@ -70,6 +73,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var detector: FaceDetector
     private lateinit var viewFinder: PreviewView
     private lateinit var graphicOverlay: GraphicOverlay
+    private lateinit var devicePolicyManager: DevicePolicyManager
+    private lateinit var adminComponent: ComponentName
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -132,7 +137,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
+        devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        adminComponent = ComponentName(this, MyAdminReceiver::class.java)
 
     }
 
@@ -169,21 +175,21 @@ class MainActivity : ComponentActivity() {
                 .padding(start = 16.dp, end=16.dp),
             contentPadding = PaddingValues(16.dp),
 
-        ) {
+            ) {
             Box(
 
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(brush = gradient, shape = RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp)).padding(16.dp),
+                    .clip(RoundedCornerShape(16.dp)).padding(16.dp),
                 contentAlignment = Alignment.Center
             ){
 
 
-            Text(
-                text = buttonText,
-                fontSize = 20.sp
-            )
+                Text(
+                    text = buttonText,
+                    fontSize = 20.sp
+                )
             }
         }
     }
@@ -332,6 +338,9 @@ class MainActivity : ComponentActivity() {
                     handler.post(adjustBrightnessAndVolumeRunnable)
                     blinkStartTime = currentTime // 타이머 리셋
                 }
+                if (currentBlinkDuration >= 5000) { // 5초 이상 눈을 감은 경우
+                    mainActivity.lockScreen() // 화면 잠금 실행
+                }
             } else {
                 if (lastBlinkState) {
                     handler.removeCallbacks(adjustBrightnessAndVolumeRunnable)
@@ -369,6 +378,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun lockScreen() {
+        if (devicePolicyManager.isAdminActive(adminComponent)) {
+            devicePolicyManager.lockNow()
+        } else {
+            // Device Admin 권한이 없으면 사용자에게 요청
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+            intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+            startActivity(intent)
+        }
+    }
 
     private class FaceGraphic(
         private val overlay: GraphicOverlay,
@@ -476,7 +495,7 @@ class GraphicOverlay(context: Context, attrs: AttributeSet?) : View(context, att
             color = Color.BLACK
             textSize = 40f
         }
-         if (blinkCount == 1){canvas.drawText("Blink State: Close", 20f, 20f, textPaint)}
+        if (blinkCount == 1){canvas.drawText("Blink State: Close", 20f, 20f, textPaint)}
         else{canvas.drawText("Blink State: Open", 20f, 20f, textPaint)}
 
     }
