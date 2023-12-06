@@ -338,7 +338,7 @@ class MainActivity : ComponentActivity() {
                     handler.post(adjustBrightnessAndVolumeRunnable)
                     blinkStartTime = currentTime // 타이머 리셋
                 }
-                if (currentBlinkDuration >= 5000) { // 5초 이상 눈을 감은 경우
+                if (currentBlinkDuration >= 15000) { // 5초 이상 눈을 감은 경우
                     mainActivity.lockScreen() // 화면 잠금 실행
                 }
             } else {
@@ -450,7 +450,7 @@ class GraphicOverlay(context: Context, attrs: AttributeSet?) : View(context, att
             color = Color.BLACK
             textSize = 40f
         }
-        canvas.drawText("Blink Count: $blinkCount", 20f, 20f, textPaint)
+        canvas.drawText("Blink Count: $blinkCount", 20f, 60f, textPaint)
     }
 
     abstract class Graphic(private val overlay: GraphicOverlay) {
