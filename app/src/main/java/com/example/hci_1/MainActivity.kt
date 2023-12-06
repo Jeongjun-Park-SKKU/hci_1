@@ -476,12 +476,9 @@ class GraphicOverlay(context: Context, attrs: AttributeSet?) : View(context, att
             color = Color.BLACK
             textSize = 40f
         }
-        canvas.drawText(
-            "Blink Duration: ${blinkDuration / 1000f} seconds",
-            20f,
-            80f,
-            textPaint
-        )
+         if (blinkCount == 1){canvas.drawText("Blink State: Close", 20f, 20f, textPaint)}
+        else{canvas.drawText("Blink State: Open", 20f, 20f, textPaint)}
+
     }
 
     override fun onDraw(canvas: Canvas) {
